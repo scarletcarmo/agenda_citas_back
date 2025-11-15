@@ -1,0 +1,268 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//(V1/V2)
+enum UserRole {
+  ADMIN
+  BUSINESS_OWNER
+  BUSINESS_STAFF
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum MessageType {
+  CONFIRMATION
+  REMINDER
+  CANCELLATION
+}
+
+// USERS — (V1/V2) 
+// ---------------------------------------------------------
+// En V1: solo dueño del negocio
+// En V2: dueño, staff y admin SaaS
+// ---------------------------------------------------------
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          UserRole
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  businesses    Business[]        @relation("OwnerOfBusiness")
+  businessUsers BusinessUser[]
+}
+
+// ---------------------------------------------------------
+// BUSINESS — (V1/V2)
+// ---------------------------------------------------------
+
+model Business {
+  id        Int      @id @default(autoincrement())
+  owner_id  Int
+  name      String
+  slug      String   @unique
+  phone     String?
+  address   String?
+  city      String?
+  country   String?
+  timezone  String?
+  status    String?  @default("ACTIVE")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  owner      User       @relation("OwnerOfBusiness", fields: [owner_id], references: [id])
+  staff      BusinessUser[]          // (V2)
+  services   Service[]               // (V1/V2)
+  employees  Employee[]              // (V1/V2)
+  customers  Customer[]              // (V1/V2)
+  appointments Appointment[]         // (V1/V2)
+  subscriptions BusinessSubscription[] // (V2)
+  payments    Payment[]              // (V2)
+  whatsappLogs WhatsappLog[]         // (V2)
+}
+
+// ---------------------------------------------------------
+// BUSINESS USER — (V2)
+// ---------------------------------------------------------
+// Usuarios internos del negocio (solo en versión SaaS)
+// En V1 NO EXISTE. Solo existe el owner.
+// ---------------------------------------------------------
+
+model BusinessUser {
+  id          Int      @id @default(autoincrement())
+  business_id Int
+  user_id     Int
+  role_in_business String
+  created_at      DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  user     User     @relation(fields: [user_id], references: [id])
+}
+
+// ---------------------------------------------------------
+// SERVICES — (V1/V2) servicios del negocio
+// ---------------------------------------------------------
+
+model Service {
+  id            Int      @id @default(autoincrement())
+  business_id   Int
+  name          String
+  description   String?
+  duration_minutes Int
+  price         Float
+  is_active     Boolean @default(true)
+  created_at    DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  employees EmployeeService[]
+  appointments Appointment[]
+}
+
+// ---------------------------------------------------------
+// EMPLOYEES — (V1/V2) empleados del negocio
+// ---------------------------------------------------------
+
+model Employee {
+  id          Int      @id @default(autoincrement())
+  business_id Int
+  name        String
+  email       String?
+  phone       String?
+  is_active   Boolean @default(true)
+  created_at  DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  services EmployeeService[]
+  appointments Appointment[]
+}
+
+
+// ---------------------------------------------------------
+// EMPLOYEE-SERVICE (pivot tabla N:N) — (V1/V2)
+// ---------------------------------------------------------
+
+model EmployeeService {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  service_id  Int
+
+  employee Employee @relation(fields: [employee_id], references: [id])
+  service  Service  @relation(fields: [service_id], references: [id])
+}
+
+// ---------------------------------------------------------
+// CUSTOMERS — (V1/V2) clientes que reservan (sin login)
+// ---------------------------------------------------------
+
+model Customer {
+  id          Int      @id @default(autoincrement())
+  business_id Int
+  name        String
+  email       String?
+  phone       String
+  notes       String?
+  created_at  DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  appointments Appointment[]
+}
+
+// ---------------------------------------------------------
+// APPOINTMENTS — (V1/V2) citas del negocio
+// ---------------------------------------------------------
+
+model Appointment {
+  id            Int                @id @default(autoincrement())
+  business_id   Int
+  customer_id   Int
+  service_id    Int
+  employee_id   Int?
+  date          DateTime
+  start_time    DateTime
+  end_time      DateTime
+  status        AppointmentStatus   @default(PENDING)
+  created_from  String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  business  Business  @relation(fields: [business_id], references: [id])
+  customer  Customer  @relation(fields: [customer_id], references: [id])
+  service   Service   @relation(fields: [service_id], references: [id])
+  employee  Employee? @relation(fields: [employee_id], references: [id])
+  whatsappLogs WhatsappLog[]
+}
+
+// ---------------------------------------------------------
+// SUBSCRIPTION PLANS — (V2)
+// ---------------------------------------------------------
+// Solo existen en SaaS (version 2), no en MVP
+// ---------------------------------------------------------
+
+model SubscriptionPlan {
+  id             Int      @id @default(autoincrement())
+  name           String
+  price_monthly  Float
+  max_employees  Int?
+  allow_whatsapp Boolean @default(false)
+  allow_payments Boolean @default(false)
+  subscriptions BusinessSubscription[]
+}
+
+// ---------------------------------------------------------
+// BUSINESS SUBSCRIPTIONS — (V2)
+// ---------------------------------------------------------
+
+model BusinessSubscription {
+  id                    Int      @id @default(autoincrement())
+  business_id           Int
+  plan_id               Int
+  status                SubscriptionStatus
+  current_period_start  DateTime
+  current_period_end    DateTime
+  created_at            DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  plan     SubscriptionPlan @relation(fields: [plan_id], references: [id])
+}
+
+// ---------------------------------------------------------
+// PAYMENTS — (V2)
+// ---------------------------------------------------------
+
+model Payment {
+  id          Int      @id @default(autoincrement())
+  business_id Int
+  amount      Float
+  currency    String
+  method      String
+  status      String
+  external_payment_id String?
+  created_at  DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+}
+
+// ---------------------------------------------------------
+// WHATSAPP LOGS — (V2)
+// ---------------------------------------------------------
+
+model WhatsappLog {
+  id            Int      @id @default(autoincrement())
+  business_id   Int
+  appointment_id Int
+  to_phone      String
+  message_type  MessageType
+  status        String
+  created_at    DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id])
+  appointment Appointment @relation(fields: [appointment_id], references: [id])
+}
