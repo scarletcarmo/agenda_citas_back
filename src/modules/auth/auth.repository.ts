@@ -5,24 +5,26 @@ export class AuthRepository {
         return prisma.user.findUnique({
             where: {
                 email
+            },
+            include: {
+                business: true  // Cargar negocios del usuario
             }
         });
     }
 
     async findById(id: number) {
-        return prisma.user.findById({
+        return prisma.user.findUnique({
             where: {
                 id
             }
         });
     }
 
-    async create(data: any) {
-        return prisma.user.create({
+    async create(data: any, tx: any = prisma) {
+        return tx.user.create({
             data
         });
     }
-
     async delete(id: number) {
         return prisma.user.delete({
             where: {

@@ -5,8 +5,8 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  //output   = "../generated/prisma"
 }
 
 datasource db {
@@ -56,7 +56,7 @@ model User {
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
   
-  businesses    Business[]        @relation("OwnerOfBusiness")
+  business    Business[]        @relation("OwnerOfBusiness")
   businessUsers BusinessUser[]
 }
 

@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { AuthController } from "../modules/auth/auth.controller";
+import { changePassword, deleteUser, getUser, login, register, updateUser } from "../modules/auth/auth.controller";
 
 const router = Router();
-const controller = new AuthController();
 
 //AUTH
-router.post("/register", controller.register.bind(controller));
-router.post("/login", controller.login.bind(controller));
+router.post("/register", register);
+router.post("/login", login);
+router.post("/changePassword", changePassword);
 //CRUD
-router.get("/:id", controller.getUser.bind(controller));
-router.put("/:id", controller.updateUser.bind(controller));
-router.delete("/:id", controller.deleteUser.bind(controller));
+router.get("/:id", getUser);
+router.put("/:id", updateUser);
+router.delete("/:id", deleteUser);
 
 export default router;
