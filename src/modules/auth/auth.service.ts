@@ -1,7 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { generateToken } from "../../utils/jwt";
 import { BusinessRepository } from "../business/business.repository";
-import { BusinessService } from "../business/business.service";
 import { AuthRepository } from "./auth.repository";
 import bcrypt from "bcrypt";
 
